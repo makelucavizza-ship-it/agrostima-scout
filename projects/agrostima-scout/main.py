@@ -31,6 +31,7 @@ from core.db import (
     init_db, salva_atto, salva_classificazione,
     atto_gia_classificato, notifica_gia_inviata, salva_notifica, log_run,
     salva_utente, attiva_utente, get_utente_by_email, aggiorna_chat_id,
+    get_ultime_opportunita,
 )
 from core.classifier import classifica_atto
 from core.notifier import invia_telegram, invia_errore_admin
@@ -202,9 +203,41 @@ async def handle_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     aggiorna_chat_id(email, chat_id)
     context.user_data.pop('attende_email', None)
+
     await update.message.reply_text(
         "✅ Tutto pronto! Riceverai qui gli alert sulle nuove opportunità."
     )
+
+    # Manda subito le ultime opportunità disponibili
+    categorie = utente.get('categorie', '[]')
+    import json as _json
+    try:
+        lista_categorie = _json.loads(categorie) if isinstance(categorie, str) else categorie
+    except Exception:
+        lista_categorie = ['perito_agrario']
+
+    categoria = lista_categorie[0] if lista_categorie else 'perito_agrario'
+    opportunita = get_ultime_opportunita(categoria, limite=5)
+
+    if opportunita:
+        await update.message.reply_text("🌾 Ecco le ultime opportunità trovate:")
+        for op in opportunita:
+            scadenza = op.get('scadenza') or 'non specificata'
+            importo = op.get('importo') or 'non disponibile'
+            comune = op.get('comune') or ''
+            testo = (
+                f"📋 {op['titolo']}\n"
+                f"📍 {comune}\n"
+                f"🏷️ {op.get('categoria', '')}\n"
+                f"📅 Scadenza: {scadenza}\n"
+                f"💶 Valore: {importo}\n"
+                f"🔗 {op['url']}"
+            )
+            await update.message.reply_text(testo)
+    else:
+        await update.message.reply_text(
+            "📭 Nessuna opportunità trovata ancora — ti avviso appena ne arriva una."
+        )
 
 
 def run_telegram_bot():

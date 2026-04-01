@@ -262,6 +262,24 @@ def get_utente_by_email(email: str) -> dict | None:
     return dict(row)
 
 
+def get_ultime_opportunita(categoria_professionista: str, limite: int = 5) -> list[dict]:
+    """Restituisce le ultime opportunità rilevanti per una categoria professionale."""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT a.titolo, a.comune, a.url, a.data_pubblicazione,
+                  c.categoria, c.scadenza, c.importo
+           FROM atti_grezzi a
+           JOIN classificazioni c ON c.atto_id = a.id
+           WHERE c.rilevante = 1
+             AND c.professionisti_interessati LIKE ?
+           ORDER BY a.scaricato_il DESC
+           LIMIT ?""",
+        (f'%{categoria_professionista}%', limite),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def aggiorna_chat_id(email: str, chat_id: str) -> bool:
     """Salva il telegram_chat_id per un utente attivo. Restituisce True se aggiornato."""
     conn = get_connection()
