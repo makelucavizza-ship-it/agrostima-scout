@@ -62,6 +62,23 @@ CREATE INDEX IF NOT EXISTS idx_atti_progetto ON atti_grezzi(progetto);
 CREATE INDEX IF NOT EXISTS idx_classificazioni_atto ON classificazioni(atto_id);
 CREATE INDEX IF NOT EXISTS idx_classificazioni_professionisti
     ON classificazioni(professionisti_interessati);
+
+CREATE TABLE IF NOT EXISTS utenti (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    cognome TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    telegram_chat_id TEXT,
+    progetto TEXT NOT NULL,
+    province TEXT DEFAULT '[]',
+    categorie TEXT DEFAULT '[]',
+    attivo INTEGER DEFAULT 0,
+    piano TEXT DEFAULT 'beta',
+    iscritto_il TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    note TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_utenti_email ON utenti(email);
+CREATE INDEX IF NOT EXISTS idx_utenti_progetto ON utenti(progetto);
 """
 
 
@@ -188,3 +205,72 @@ def log_run(
              filtrati_regex, classificati_ai, errori, durata_secondi),
         )
     conn.close()
+
+
+def salva_utente(
+    nome: str,
+    cognome: str,
+    email: str,
+    progetto: str,
+    province: list = None,
+    categorie: list = None,
+) -> int | None:
+    """
+    Inserisce un nuovo utente beta.
+    Restituisce l'id del record inserito, o None se l'email era già presente.
+    """
+    conn = get_connection()
+    try:
+        with conn:
+            cursor = conn.execute(
+                """INSERT INTO utenti (nome, cognome, email, progetto, province, categorie)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    nome, cognome, email, progetto,
+                    json.dumps(province or [], ensure_ascii=False),
+                    json.dumps(categorie or [], ensure_ascii=False),
+                ),
+            )
+            return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        return None
+    finally:
+        conn.close()
+
+
+def attiva_utente(email: str) -> bool:
+    """Imposta attivo=1. Restituisce True se l'utente esiste."""
+    conn = get_connection()
+    try:
+        with conn:
+            cursor = conn.execute(
+                "UPDATE utenti SET attivo = 1 WHERE email = ?", (email,)
+            )
+            return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def get_utente_by_email(email: str) -> dict | None:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM utenti WHERE email = ?", (email,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+def aggiorna_chat_id(email: str, chat_id: str) -> bool:
+    """Salva il telegram_chat_id per un utente attivo. Restituisce True se aggiornato."""
+    conn = get_connection()
+    try:
+        with conn:
+            cursor = conn.execute(
+                "UPDATE utenti SET telegram_chat_id = ? WHERE email = ? AND attivo = 1",
+                (chat_id, email),
+            )
+            return cursor.rowcount > 0
+    finally:
+        conn.close()

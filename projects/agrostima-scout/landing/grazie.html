@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgroStima Scout — Iscrizione ricevuta</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 2px 16px rgba(0,0,0,.08);
+      text-align: center;
+    }
+    .icon { font-size: 3rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: .75rem; }
+    p { color: #555; font-size: .95rem; line-height: 1.6; margin-bottom: 1rem; }
+    .steps {
+      background: #f9f9f7;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      text-align: left;
+      margin: 1.5rem 0;
+    }
+    .steps p { margin-bottom: .5rem; color: #333; }
+    .steps p:last-child { margin-bottom: 0; }
+    .note { font-size: .8rem; color: #999; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Iscrizione ricevuta!</h1>
+    <p>
+      La tua richiesta di accesso beta è stata registrata.
+      Riceverai conferma entro 24 ore.
+    </p>
+
+    <div class="steps">
+      <p><strong>Cosa succede adesso:</strong></p>
+      <p>1. Revisione manuale della tua iscrizione</p>
+      <p>2. Email di conferma con istruzioni di attivazione</p>
+      <p>3. Apri il bot Telegram e digita <code>/start</code></p>
+      <p>4. Da quel momento ricevi alert in tempo reale</p>
+    </div>
+
+    <p class="note">
+      Se non ricevi notizie entro 24h, controlla la cartella spam.
+    </p>
+  </div>
+</body>
+</html>

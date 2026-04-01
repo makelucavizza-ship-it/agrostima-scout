@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgroStima Scout — Iscriviti alla beta</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 2px 16px rgba(0,0,0,.08);
+    }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .25rem .75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: .5rem; }
+    .subtitle { color: #555; font-size: .95rem; margin-bottom: 2rem; line-height: 1.5; }
+    label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; color: #333; }
+    input, select {
+      width: 100%;
+      padding: .65rem .9rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+      margin-bottom: 1.1rem;
+      background: #fafafa;
+    }
+    input:focus, select:focus { border-color: #4caf50; background: #fff; }
+    .row { display: flex; gap: 1rem; }
+    .row > div { flex: 1; }
+    button {
+      width: 100%;
+      padding: .8rem;
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:hover { background: #1b5e20; }
+    button:disabled { background: #aaa; cursor: default; }
+    .error { color: #c62828; font-size: .85rem; margin-top: .75rem; }
+    .fine-print {
+      font-size: .75rem;
+      color: #888;
+      margin-top: 1.25rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">🌾 Beta gratuita</span>
+    <h1>AgroStima Scout</h1>
+    <p class="subtitle">
+      Alert immediati su espropri, aste agricole e bandi per periti agrari
+      in provincia di Forlì-Cesena. Direttamente su Telegram.
+    </p>
+
+    <form id="form">
+      <div class="row">
+        <div>
+          <label for="nome">Nome</label>
+          <input type="text" id="nome" name="nome" placeholder="Mario" required>
+        </div>
+        <div>
+          <label for="cognome">Cognome</label>
+          <input type="text" id="cognome" name="cognome" placeholder="Rossi" required>
+        </div>
+      </div>
+
+      <label for="email">Email professionale</label>
+      <input type="email" id="email" name="email" placeholder="mario@studio.it" required>
+
+      <label for="provincia">Provincia di interesse</label>
+      <select id="provincia" name="provincia">
+        <option value="FC" selected>Forlì-Cesena (FC)</option>
+        <option value="RA">Ravenna (RA)</option>
+        <option value="BO">Bologna (BO)</option>
+        <option value="FE">Ferrara (FE)</option>
+        <option value="MO">Modena (MO)</option>
+        <option value="RE">Reggio Emilia (RE)</option>
+        <option value="PR">Parma (PR)</option>
+        <option value="PC">Piacenza (PC)</option>
+        <option value="RN">Rimini (RN)</option>
+      </select>
+
+      <label for="specializzazione">Specializzazione</label>
+      <select id="specializzazione" name="specializzazione">
+        <option value="perito_agrario">Perito agrario estimatore</option>
+        <option value="geometra">Geometra</option>
+        <option value="ingegnere">Ingegnere</option>
+        <option value="altro">Altro</option>
+      </select>
+
+      <button type="submit" id="btn">Iscriviti alla beta gratuita</button>
+      <div class="error" id="err" style="display:none"></div>
+    </form>
+
+    <p class="fine-print">
+      Nessuna carta di credito. Accesso approvato manualmente entro 24h.
+    </p>
+  </div>
+
+  <script>
+    document.getElementById('form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn');
+      const errEl = document.getElementById('err');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Invio in corso...';
+
+      const payload = {
+        nome: document.getElementById('nome').value.trim(),
+        cognome: document.getElementById('cognome').value.trim(),
+        email: document.getElementById('email').value.trim().toLowerCase(),
+        provincia: document.getElementById('provincia').value,
+        specializzazione: document.getElementById('specializzazione').value,
+      };
+
+      try {
+        const res = await fetch('/iscrizione', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          window.location.href = '/grazie';
+        } else {
+          const data = await res.json();
+          errEl.textContent = data.detail || 'Errore durante la registrazione.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Iscriviti alla beta gratuita';
+        }
+      } catch (_) {
+        errEl.textContent = 'Errore di rete. Riprova tra qualche secondo.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Iscriviti alla beta gratuita';
+      }
+    });
+  </script>
+</body>
+</html>
