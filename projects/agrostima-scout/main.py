@@ -211,16 +211,21 @@ def run_telegram_bot():
     if not BOT_TOKEN:
         logger.warning("TELEGRAM_BOT_TOKEN non configurato — bot non avviato")
         return
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler('start', cmd_start))
-    application.add_handler(CommandHandler('approva', cmd_approva))
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_email)
-    )
-    logger.info("Bot Telegram avviato (polling)")
-    application.run_polling(stop_signals=None)
+
+    async def _main():
+        application = Application.builder().token(BOT_TOKEN).build()
+        application.add_handler(CommandHandler('start', cmd_start))
+        application.add_handler(CommandHandler('approva', cmd_approva))
+        application.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_email)
+        )
+        logger.info("Bot Telegram avviato (polling)")
+        async with application:
+            await application.start()
+            await application.updater.start_polling()
+            await asyncio.sleep(float('inf'))
+
+    asyncio.run(_main())
 
 
 # ── Crawling pipeline ────────────────────────────────────────────────────────
