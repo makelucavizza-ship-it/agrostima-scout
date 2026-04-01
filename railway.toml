@@ -1,8 +1,6 @@
 [build]
-builder = "nixpacks"
-buildCommand = "python -m pip install -r projects/agrostima-scout/requirements.txt"
+builder = "dockerfile"
 
 [deploy]
-startCommand = "cd projects/agrostima-scout && python main.py"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
