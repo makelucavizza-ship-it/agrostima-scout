@@ -1,0 +1,3 @@
+codici.txt
+*.env
+.env
