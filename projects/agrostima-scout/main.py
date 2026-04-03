@@ -76,6 +76,11 @@ if LANDING_DIR.exists():
     app.mount('/static', StaticFiles(directory=str(LANDING_DIR)), name='static')
 
 
+@app.get('/health')
+async def health():
+    return {'status': 'ok'}
+
+
 @app.get('/')
 async def index():
     html = LANDING_DIR / 'index.html'
