@@ -1,0 +1,22 @@
+# Env e segreti — mai committare
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Database — volatile, si ricrea all'avvio
+data/shared.db
+
+# Temp e OS
+*.tmp
+.DS_Store
+Thumbs.db
+
+# File generati da apri_admin.py
+agrostima_admin_*.html

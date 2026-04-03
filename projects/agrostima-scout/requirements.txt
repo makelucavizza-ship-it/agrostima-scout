@@ -7,3 +7,4 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 python-telegram-bot==21.9
 resend==2.26.0
+email-validator==2.2.0

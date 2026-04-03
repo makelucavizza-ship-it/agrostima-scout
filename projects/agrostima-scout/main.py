@@ -11,12 +11,21 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / '.env')
+# In locale legge il .env; su Railway le variabili sono già nell'ambiente
+_env_file = Path(__file__).parent / '.env'
+if _env_file.exists():
+    # Legge manualmente per gestire encoding non standard
+    with open(_env_file, 'r', encoding='utf-8-sig') as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if '=' in _line and not _line.startswith('#'):
+                _k, _v = _line.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -28,10 +37,10 @@ from telegram.ext import (
 )
 
 from core.db import (
-    init_db, salva_atto, salva_classificazione,
+    init_db, get_connection, salva_atto, salva_classificazione,
     atto_gia_classificato, notifica_gia_inviata, salva_notifica, log_run,
     salva_utente, attiva_utente, get_utente_by_email, aggiorna_chat_id,
-    get_ultime_opportunita,
+    get_ultime_opportunita, get_utenti_attivi_con_chat,
 )
 from core.classifier import classifica_atto
 from core.notifier import invia_telegram, invia_errore_admin
@@ -40,6 +49,8 @@ from core.config import passa_prefiltro, categorie_probabili
 from crawler.pvp import PvpCrawler
 from crawler.asteweb import AstewebCrawler
 from crawler.albo_pretorio_fc import AlboPretorioFcCrawler
+from crawler.albo_pretorio_rn import AlboPretorioRnCrawler
+from crawler.albo_pretorio_ra import AlboPretorioRaCrawler
 from crawler.agrea import AgreaCrawler
 from crawler.bonifica import BonificaCrawler
 
@@ -79,6 +90,134 @@ async def grazie():
     if html.exists():
         return FileResponse(str(html))
     return {'status': 'ok'}
+
+
+@app.get('/dashboard')
+async def dashboard():
+    html = Path(__file__).parent / 'dashboard.html'
+    if html.exists():
+        return FileResponse(str(html))
+    return {'status': 'ok', 'message': 'dashboard.html non trovato'}
+
+
+@app.get('/admin')
+async def admin():
+    html = Path(__file__).parent / 'admin.html'
+    if html.exists():
+        return FileResponse(str(html))
+    return {'status': 'ok', 'message': 'admin.html non trovato'}
+
+
+@app.get('/api/admin/atti')
+async def api_admin_atti():
+    """Tutti gli atti con classificazione — per la dashboard admin."""
+    query = """
+        SELECT
+            ag.id, ag.titolo, ag.fonte, ag.comune, ag.provincia,
+            ag.data_pubblicazione, ag.scaricato_il, ag.url,
+            cl.categoria, cl.professionisti_interessati,
+            cl.rilevante, cl.urgenza, cl.scadenza, cl.importo
+        FROM atti_grezzi ag
+        LEFT JOIN classificazioni cl ON cl.atto_id = ag.id
+        ORDER BY ag.scaricato_il DESC
+        LIMIT 500
+    """
+    with get_connection() as conn:
+        rows = conn.execute(query).fetchall()
+
+    import json as _json
+    risultati = []
+    for r in rows:
+        prof_raw = r[9]
+        try:
+            professionisti = _json.loads(prof_raw) if prof_raw else []
+        except Exception:
+            professionisti = []
+        risultati.append({
+            'id': r[0], 'titolo': r[1], 'fonte': r[2],
+            'comune': r[3], 'provincia': r[4],
+            'data_pubblicazione': r[5], 'scaricato_il': r[6], 'url': r[7],
+            'categoria': r[8], 'professionisti': professionisti,
+            'rilevante': bool(r[10]), 'urgenza': bool(r[11]),
+            'scadenza': r[12], 'importo': r[13],
+        })
+    return JSONResponse(risultati)
+
+
+@app.get('/api/admin/stats')
+async def api_admin_stats():
+    """Statistiche aggregate per categoria professionale e fonte."""
+    import json as _json
+    from collections import defaultdict
+
+    with get_connection() as conn:
+        tot_atti = conn.execute('SELECT COUNT(*) FROM atti_grezzi').fetchone()[0]
+        tot_cl = conn.execute('SELECT COUNT(*) FROM classificazioni').fetchone()[0]
+        per_fonte = dict(conn.execute(
+            'SELECT fonte, COUNT(*) FROM atti_grezzi GROUP BY fonte'
+        ).fetchall())
+        prof_rows = conn.execute(
+            'SELECT professionisti_interessati FROM classificazioni WHERE professionisti_interessati IS NOT NULL'
+        ).fetchall()
+
+    per_prof = defaultdict(int)
+    for (raw,) in prof_rows:
+        try:
+            for p in _json.loads(raw):
+                per_prof[p] += 1
+        except Exception:
+            pass
+
+    return JSONResponse({
+        'totali': {'atti': tot_atti, 'classificati': tot_cl},
+        'per_fonte': per_fonte,
+        'per_professionista': dict(sorted(per_prof.items(), key=lambda x: -x[1])),
+    })
+
+
+@app.get('/api/opportunita')
+async def api_opportunita(province: str = Query(default='FC,RN,RA')):
+    """
+    Restituisce opportunità rilevanti per perito agrario filtrate per provincia.
+    province: stringa CSV di sigle (es. 'FC,RN,RA')
+    """
+    province_list = [p.strip().upper() for p in province.split(',') if p.strip()]
+    if not province_list:
+        return JSONResponse([])
+
+    placeholders = ','.join('?' * len(province_list))
+    query = f"""
+        SELECT
+            ag.titolo, ag.comune, ag.provincia, ag.url, ag.fonte,
+            ag.data_pubblicazione, ag.scaricato_il,
+            cl.categoria, cl.scadenza, cl.importo
+        FROM atti_grezzi ag
+        JOIN classificazioni cl ON cl.atto_id = ag.id
+        WHERE cl.rilevante = 1
+          AND cl.professionisti_interessati LIKE '%perito_agrario%'
+          AND ag.provincia IN ({placeholders})
+        ORDER BY ag.scaricato_il DESC
+        LIMIT 100
+    """
+    with get_connection() as conn:
+        rows = conn.execute(query, province_list).fetchall()
+
+    risultati = [
+        {
+            'titolo': r[0],
+            'comune': r[1],
+            'provincia': r[2],
+            'url': r[3],
+            'fonte': r[4],
+            'data_pubblicazione': r[5],
+            'scaricato_il': r[6],
+            'categoria': r[7],
+            'scadenza': r[8],
+            'importo': r[9],
+        }
+        for r in rows
+    ]
+    return JSONResponse(risultati)
 
 
 class IscrizioneForm(BaseModel):
@@ -277,7 +416,7 @@ def _formatta_notifica(atto: dict, classificazione: dict, fonte: str) -> str:
     return (
         f"🌾 NUOVA OPPORTUNITÀ — {fonte}\n\n"
         f"📋 {atto['titolo']}\n"
-        f"📍 {atto.get('comune', '')} (FC)\n"
+        f"📍 {atto.get('comune', '')} ({atto.get('provincia', '')})\n"
         f"🏷️ {classificazione.get('categoria', '')}\n"
         f"📅 Scadenza: {scadenza}\n"
         f"💶 Valore: {importo}\n\n"
@@ -323,8 +462,11 @@ def _processa_atti(atti: list[dict], fonte: str) -> dict:
         if e_rilevante_per_agrostima(classificazione):
             if not notifica_gia_inviata(atto_id, PROGETTO, 'telegram'):
                 messaggio = _formatta_notifica(atto, classificazione, fonte)
-                invia_telegram(messaggio)
-                salva_notifica(atto_id, PROGETTO, 'telegram')
+                utenti = get_utenti_attivi_con_chat(PROGETTO)
+                for utente in utenti:
+                    invia_telegram(messaggio, chat_id=utente['telegram_chat_id'])
+                if utenti:
+                    salva_notifica(atto_id, PROGETTO, 'telegram')
 
     return stats
 
@@ -359,6 +501,8 @@ def _crawl(crawler_cls, fonte_label: str):
 def crawl_pvp(): _crawl(PvpCrawler, 'pvp')
 def crawl_asteweb(): _crawl(AstewebCrawler, 'asteweb')
 def crawl_albo_pretorio(): _crawl(AlboPretorioFcCrawler, 'albo_pretorio_fc')
+def crawl_albo_pretorio_rn(): _crawl(AlboPretorioRnCrawler, 'albo_pretorio_rn')
+def crawl_albo_pretorio_ra(): _crawl(AlboPretorioRaCrawler, 'albo_pretorio_ra')
 def crawl_agrea(): _crawl(AgreaCrawler, 'agrea')
 def crawl_bonifica(): _crawl(BonificaCrawler, 'bonifica')
 
@@ -373,7 +517,9 @@ if __name__ == '__main__':
     scheduler = BackgroundScheduler(timezone='Europe/Rome')
     scheduler.add_job(crawl_pvp, 'interval', hours=6, id='pvp')
     scheduler.add_job(crawl_asteweb, 'interval', hours=6, id='asteweb')
-    scheduler.add_job(crawl_albo_pretorio, 'cron', hour=7, id='albo')
+    scheduler.add_job(crawl_albo_pretorio, 'cron', hour=7, id='albo_fc')
+    scheduler.add_job(crawl_albo_pretorio_rn, 'cron', hour=7, minute=10, id='albo_rn')
+    scheduler.add_job(crawl_albo_pretorio_ra, 'cron', hour=7, minute=20, id='albo_ra')
     scheduler.add_job(crawl_agrea, 'cron', hour=8, id='agrea')
     scheduler.add_job(crawl_bonifica, 'cron', hour=8, minute=30, id='bonifica')
 

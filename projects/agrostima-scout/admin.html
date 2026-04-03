@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgroStima — Admin Dashboard</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f0ec;
+  color: #1a1a1a;
+  font-size: 14px;
+}
+
+header {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 0.9rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 { font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
+header .sub { font-size: 0.75rem; color: #aaa; }
+
+/* ── STATS ── */
+.stats-bar {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 1rem 1.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.stat-card {
+  background: #f8f8f5;
+  border: 1px solid #e0e0d8;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  min-width: 110px;
+  text-align: center;
+}
+.stat-card .n { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.stat-card .label { font-size: 0.7rem; color: #666; margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.prof-bars { flex: 1; min-width: 280px; }
+.prof-bars h3 { font-size: 0.75rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+.bar-label { width: 160px; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 14px; background: #e8e8e4; border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: #2d6a2d; border-radius: 3px; transition: width 0.4s; }
+.bar-count { font-size: 0.75rem; color: #555; min-width: 30px; text-align: right; }
+
+/* ── FILTRI ── */
+.filters {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 0.7rem 1.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filters label { font-size: 0.75rem; font-weight: 600; color: #555; margin-right: 0.3rem; }
+select, input[type=text] {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: #fff;
+}
+.filter-group { display: flex; align-items: center; }
+#search { width: 220px; }
+.count-badge {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* ── TABELLA ── */
+.table-wrap {
+  overflow-x: auto;
+  padding: 1rem 1.5rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e0e0d8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+thead th {
+  background: #f5f5f0;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #555;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th:hover { background: #ebebe5; }
+thead th.sorted-asc::after { content: ' ↑'; }
+thead th.sorted-desc::after { content: ' ↓'; }
+
+tbody tr { border-bottom: 1px solid #f0f0ea; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #fafaf7; }
+
+td { padding: 0.5rem 0.8rem; vertical-align: top; }
+td.titolo { max-width: 320px; }
+td.titolo a { color: #1a1a1a; text-decoration: none; font-weight: 500; line-height: 1.3; display: block; }
+td.titolo a:hover { color: #2d6a2d; text-decoration: underline; }
+td.titolo .meta { font-size: 0.72rem; color: #888; margin-top: 0.2rem; }
+
+.prof-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin: 1px;
+  white-space: nowrap;
+}
+
+/* colori per professionista */
+.pb-perito_agrario     { background: #d4edda; color: #155724; }
+.pb-geometra           { background: #cce5ff; color: #004085; }
+.pb-ingegnere          { background: #fff3cd; color: #856404; }
+.pb-avvocato           { background: #f8d7da; color: #721c24; }
+.pb-commercialista     { background: #e2d9f3; color: #4a235a; }
+.pb-revisore_enti_locali { background: #d1ecf1; color: #0c5460; }
+.pb-geologo            { background: #fde8c8; color: #7d4009; }
+.pb-altro              { background: #e9e9e9; color: #555; }
+
+.tag-rilevante { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; font-weight: 700; }
+.tag-si  { background: #d4edda; color: #155724; }
+.tag-no  { background: #f5f5f0; color: #999; }
+
+.fonte-tag { font-size: 0.72rem; color: #666; background: #f0f0ea; padding: 0.1rem 0.35rem; border-radius: 3px; white-space: nowrap; }
+.prov-tag  { font-size: 0.72rem; font-weight: 700; color: #fff; background: #555; padding: 0.1rem 0.35rem; border-radius: 3px; }
+
+.no-data { text-align: center; padding: 3rem; color: #999; }
+.loading  { text-align: center; padding: 2rem; color: #999; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AgroStima Scout — Admin Dashboard</h1>
+    <div class="sub">Tutti gli atti raccolti dai crawler con classificazione AI</div>
+  </div>
+  <div class="sub" id="last-update"></div>
+</header>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="loading">Caricamento statistiche...</div>
+</div>
+
+<div class="filters">
+  <div class="filter-group">
+    <label>Professionista</label>
+    <select id="f-prof">
+      <option value="">Tutti</option>
+      <option value="perito_agrario">Perito agrario</option>
+      <option value="geometra">Geometra</option>
+      <option value="ingegnere">Ingegnere</option>
+      <option value="avvocato">Avvocato</option>
+      <option value="commercialista">Commercialista</option>
+      <option value="revisore_enti_locali">Revisore enti locali</option>
+      <option value="geologo">Geologo</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Fonte</label>
+    <select id="f-fonte"><option value="">Tutte</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Provincia</label>
+    <select id="f-prov"><option value="">Tutte</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Rilevante</label>
+    <select id="f-rilevante">
+      <option value="">Tutti</option>
+      <option value="si">Sì</option>
+      <option value="no">No / non classificato</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Cerca</label>
+    <input type="text" id="search" placeholder="titolo o comune...">
+  </div>
+  <span class="count-badge" id="count-badge"></span>
+</div>
+
+<div class="table-wrap">
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th data-col="titolo">Titolo / Fonte</th>
+        <th data-col="provincia">Prov.</th>
+        <th data-col="categoria">Tipo atto</th>
+        <th data-col="professionisti">Professionisti</th>
+        <th data-col="rilevante">Rilevante</th>
+        <th data-col="scaricato_il">Trovato il</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="6" class="loading">Caricamento dati...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const LABEL = {
+  perito_agrario: 'Perito agrario',
+  geometra: 'Geometra',
+  ingegnere: 'Ingegnere',
+  avvocato: 'Avvocato',
+  commercialista: 'Commercialista',
+  revisore_enti_locali: 'Revisore EL',
+  geologo: 'Geologo',
+  altro: 'Altro',
+};
+
+let allData = [];
+let sortCol = 'scaricato_il';
+let sortDir = -1; // -1 = desc
+
+async function init() {
+  const [atti, stats] = await Promise.all([
+    fetch('/api/admin/atti').then(r => r.json()),
+    fetch('/api/admin/stats').then(r => r.json()),
+  ]);
+  allData = atti;
+  renderStats(stats);
+  populateFilters(atti);
+  renderTable();
+  document.getElementById('last-update').textContent =
+    'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
+}
+
+function renderStats(stats) {
+  const bar = document.getElementById('stats-bar');
+  const perProf = stats.per_professionista || {};
+  const perFonte = stats.per_fonte || {};
+  const tot = stats.totali || {};
+  const maxProf = Math.max(...Object.values(perProf), 1);
+
+  const fonteHtml = Object.entries(perFonte)
+    .sort((a,b) => b[1]-a[1])
+    .map(([f,n]) => `<span class="fonte-tag">${f}: <strong>${n}</strong></span>`)
+    .join(' ');
+
+  const barRows = Object.entries(perProf).map(([p, n]) => `
+    <div class="bar-row">
+      <div class="bar-label">${LABEL[p] || p}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxProf*100)}%"></div></div>
+      <div class="bar-count">${n}</div>
+    </div>
+  `).join('');
+
+  bar.innerHTML = `
+    <div class="stat-card"><div class="n">${tot.atti||0}</div><div class="label">Atti totali</div></div>
+    <div class="stat-card"><div class="n">${tot.classificati||0}</div><div class="label">Classificati</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="document.getElementById('f-rilevante').value='si';renderTable()">
+      <div class="n" style="color:#155724">${allData.filter(a=>a.rilevante).length}</div>
+      <div class="label">Rilevanti</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.4rem;justify-content:center">
+      <div style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em">Fonti</div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap">${fonteHtml}</div>
+    </div>
+    <div class="prof-bars">
+      <h3>Opportunità per categoria professionale</h3>
+      ${barRows || '<div style="color:#999;font-size:.8rem">Nessuna classificazione</div>'}
+    </div>
+  `;
+
+  // click sulle barre → filtra per professionista
+  document.querySelectorAll('.bar-row').forEach((row, i) => {
+    const prof = Object.keys(perProf)[i];
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      document.getElementById('f-prof').value = prof;
+      renderTable();
+    });
+  });
+}
+
+function populateFilters(data) {
+  const fonti = [...new Set(data.map(a => a.fonte).filter(Boolean))].sort();
+  const provs = [...new Set(data.map(a => a.provincia).filter(Boolean))].sort();
+
+  const fFonte = document.getElementById('f-fonte');
+  fonti.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; fFonte.appendChild(o); });
+
+  const fProv = document.getElementById('f-prov');
+  provs.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; fProv.appendChild(o); });
+}
+
+function getFiltered() {
+  const fProf = document.getElementById('f-prof').value;
+  const fFonte = document.getElementById('f-fonte').value;
+  const fProv = document.getElementById('f-prov').value;
+  const fRilev = document.getElementById('f-rilevante').value;
+  const q = document.getElementById('search').value.toLowerCase();
+
+  return allData.filter(a => {
+    if (fProf && !a.professionisti.includes(fProf)) return false;
+    if (fFonte && a.fonte !== fFonte) return false;
+    if (fProv && a.provincia !== fProv) return false;
+    if (fRilev === 'si' && !a.rilevante) return false;
+    if (fRilev === 'no' && a.rilevante) return false;
+    if (q && !((a.titolo||'').toLowerCase().includes(q) || (a.comune||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderTable() {
+  const data = getFiltered();
+  data.sort((a, b) => {
+    let va = a[sortCol] ?? '';
+    let vb = b[sortCol] ?? '';
+    if (typeof va === 'boolean') va = va ? 1 : 0;
+    if (typeof vb === 'boolean') vb = vb ? 1 : 0;
+    return va < vb ? sortDir : va > vb ? -sortDir : 0;
+  });
+
+  document.getElementById('count-badge').textContent = `${data.length} atti`;
+
+  const tbody = document.getElementById('tbody');
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="no-data">Nessun atto corrisponde ai filtri.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(a => {
+    const profBadges = (a.professionisti || []).map(p =>
+      `<span class="prof-badge pb-${p}">${LABEL[p]||p}</span>`
+    ).join('') || '<span style="color:#bbb;font-size:.75rem">—</span>';
+
+    const rilTag = a.rilevante
+      ? '<span class="tag-rilevante tag-si">Sì</span>'
+      : '<span class="tag-rilevante tag-no">No</span>';
+
+    const data_str = a.scaricato_il ? a.scaricato_il.slice(0,10) : '—';
+    const fonte = a.fonte || '—';
+    const prov = a.provincia || '';
+    const comune = a.comune || '';
+
+    return `<tr>
+      <td class="titolo">
+        <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titolo || '—')}</a>
+        <div class="meta">
+          <span class="fonte-tag">${esc(fonte)}</span>
+          ${comune ? ' · ' + esc(comune) : ''}
+          ${a.scadenza ? ' · Scad. ' + esc(a.scadenza) : ''}
+          ${a.importo ? ' · ' + esc(a.importo) + '€' : ''}
+        </div>
+      </td>
+      <td><span class="prov-tag">${esc(prov)||'—'}</span></td>
+      <td style="color:#555;font-size:.8rem">${esc(a.categoria||'—')}</td>
+      <td>${profBadges}</td>
+      <td>${rilTag}</td>
+      <td style="color:#888;font-size:.78rem;white-space:nowrap">${data_str}</td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Sorting
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) sortDir *= -1;
+    else { sortCol = col; sortDir = -1; }
+    document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted-asc','sorted-desc'));
+    th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+    renderTable();
+  });
+});
+
+// Filtri live
+['f-prof','f-fonte','f-prov','f-rilevante'].forEach(id =>
+  document.getElementById(id).addEventListener('change', renderTable)
+);
+document.getElementById('search').addEventListener('input', renderTable);
+
+init();
+</script>
+</body>
+</html>

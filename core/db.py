@@ -292,3 +292,20 @@ def aggiorna_chat_id(email: str, chat_id: str) -> bool:
             return cursor.rowcount > 0
     finally:
         conn.close()
+
+
+def get_utenti_attivi_con_chat(progetto: str) -> list[dict]:
+    """
+    Restituisce utenti attivi con telegram_chat_id configurato.
+    Usato per inviare notifiche a tutti gli utenti registrati.
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT telegram_chat_id, categorie
+           FROM utenti
+           WHERE progetto = ? AND attivo = 1
+             AND telegram_chat_id IS NOT NULL AND telegram_chat_id != ''""",
+        (progetto,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

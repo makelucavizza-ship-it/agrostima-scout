@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgroStima Scout — Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #2d6a2d;
+    color: #fff;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  header h1 { font-size: 1.2rem; font-weight: 600; }
+  header span { font-size: 1.4rem; }
+
+  .controls {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .control-group label { font-size: 0.8rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  select {
+    padding: 0.4rem 0.7rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  .slider-row { display: flex; align-items: center; gap: 0.6rem; }
+  input[type=range] { width: 140px; accent-color: #2d6a2d; }
+  .slider-val { font-size: 0.95rem; font-weight: 600; color: #2d6a2d; min-width: 60px; }
+
+  .badge-province {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #e8f3e8;
+    color: #2d6a2d;
+    border: 1px solid #b5d9b5;
+  }
+
+  .stats {
+    padding: 0.6rem 1.5rem;
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .list {
+    padding: 1rem 1.5rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e0e0d8;
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem 1rem;
+    align-items: start;
+  }
+
+  .card-body { min-width: 0; }
+  .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 0.3rem;
+    line-height: 1.3;
+  }
+  .card-meta {
+    font-size: 0.8rem;
+    color: #666;
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+  }
+  .card-meta span { display: flex; align-items: center; gap: 0.2rem; }
+  .prov-tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #2d6a2d;
+    color: #fff;
+  }
+
+  .card-link a {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    background: #2d6a2d;
+    color: #fff;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .card-link a:hover { background: #245224; }
+
+  .empty {
+    text-align: center;
+    padding: 3rem;
+    color: #888;
+    font-size: 0.95rem;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: #888;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span>🌾</span>
+  <h1>AgroStima Scout — Opportunità</h1>
+</header>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Provincia di origine</label>
+    <select id="sel-provincia">
+      <option value="FC">FC — Forlì-Cesena</option>
+      <option value="RN">RN — Rimini</option>
+      <option value="RA">RA — Ravenna</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label>Raggio di spostamento</label>
+    <div class="slider-row">
+      <input type="range" id="slider-raggio" min="30" max="150" step="10" value="100">
+      <span class="slider-val" id="val-raggio">100 km</span>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <label>Province incluse</label>
+    <div class="badge-province" id="badge-province"></div>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="list" id="list"><div class="loading">Caricamento...</div></div>
+
+<script>
+// Logica raggio → province
+// ≤50km: solo provincia selezionata
+// ≤100km: FC + RN + RA
+// >100km: FC + RN + RA + province confinanti (BO, RE, RIM, PU, AN)
+const VICINE = ['BO', 'RE', 'RIM', 'PU', 'AN'];
+const BACINO = ['FC', 'RN', 'RA'];
+
+function calcProvince(origine, raggio) {
+  if (raggio <= 50) return [origine];
+  if (raggio <= 100) return [...BACINO];
+  return [...BACINO, ...VICINE];
+}
+
+const selProvincia = document.getElementById('sel-provincia');
+const sliderRaggio = document.getElementById('slider-raggio');
+const valRaggio    = document.getElementById('val-raggio');
+const badgeEl      = document.getElementById('badge-province');
+const statsEl      = document.getElementById('stats');
+const listEl       = document.getElementById('list');
+
+let tutti = [];   // tutti gli atti caricati
+let correnti = []; // filtrati per province correnti
+
+async function caricaTutti() {
+  try {
+    const resp = await fetch('/api/opportunita?province=FC,RN,RA,BO,RE,RIM,PU,AN');
+    if (!resp.ok) throw new Error(resp.statusText);
+    tutti = await resp.json();
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty">Errore nel caricamento: ${e.message}</div>`;
+    return;
+  }
+  aggiorna();
+}
+
+function aggiorna() {
+  const origine = selProvincia.value;
+  const raggio  = parseInt(sliderRaggio.value);
+  const province = calcProvince(origine, raggio);
+
+  valRaggio.textContent = raggio + ' km';
+
+  badgeEl.innerHTML = province
+    .map(p => `<span class="badge">${p}</span>`)
+    .join('');
+
+  correnti = tutti.filter(a => province.includes(a.provincia));
+
+  statsEl.textContent = correnti.length === 0
+    ? 'Nessuna opportunità trovata per le province selezionate.'
+    : `${correnti.length} opportunità trovate`;
+
+  if (correnti.length === 0) {
+    listEl.innerHTML = '<div class="empty">Nessuna opportunità per le province selezionate.<br>Prova ad aumentare il raggio.</div>';
+    return;
+  }
+
+  listEl.innerHTML = correnti.map(a => {
+    const scadenza = a.scadenza ? `📅 ${a.scadenza}` : '';
+    const importo  = a.importo  ? `💶 ${a.importo}`  : '';
+    const data     = a.data_pubblicazione ? `📄 ${a.data_pubblicazione}` : '';
+    const categoria = a.categoria || '';
+    const comune   = a.comune ? `📍 ${a.comune}` : '';
+
+    return `
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title">${esc(a.titolo)}</div>
+          <div class="card-meta">
+            <span><span class="prov-tag">${esc(a.provincia)}</span></span>
+            ${comune   ? `<span>${esc(comune)}</span>` : ''}
+            ${categoria ? `<span>🏷️ ${esc(categoria)}</span>` : ''}
+            ${scadenza ? `<span>${esc(scadenza)}</span>` : ''}
+            ${importo  ? `<span>${esc(importo)}</span>` : ''}
+            ${data     ? `<span>${esc(data)}</span>` : ''}
+          </div>
+        </div>
+        <div class="card-link">
+          <a href="${esc(a.url)}" target="_blank" rel="noopener">Apri →</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+selProvincia.addEventListener('change', aggiorna);
+sliderRaggio.addEventListener('input', aggiorna);
+
+caricaTutti();
+</script>
+</body>
+</html>
