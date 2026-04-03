@@ -523,13 +523,18 @@ if __name__ == '__main__':
     scheduler.add_job(crawl_agrea, 'cron', hour=8, id='agrea')
     scheduler.add_job(crawl_bonifica, 'cron', hour=8, minute=30, id='bonifica')
 
-    # Crawl immediato al primo avvio
-    logger.info("Avvio crawl iniziale...")
-    crawl_pvp()
-    crawl_asteweb()
-
     scheduler.start()
     logger.info("Scheduler avviato")
+
+    # Crawl iniziale in background — uvicorn parte subito senza aspettare
+    def _crawl_iniziale():
+        import time as _time
+        _time.sleep(3)  # lascia partire uvicorn
+        logger.info("Avvio crawl iniziale in background...")
+        crawl_pvp()
+        crawl_asteweb()
+
+    threading.Thread(target=_crawl_iniziale, daemon=True).start()
 
     # Bot Telegram in thread separato con proprio event loop
     bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)

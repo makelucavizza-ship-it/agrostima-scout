@@ -60,8 +60,8 @@ class AstewebCrawler(BaseCrawler):
         r.raise_for_status()
         time.sleep(2)
         ids = [item['idLotto'] for item in r.json() if 'idLotto' in item]
-        logger.info(f'[asteweb] Lotti nazionali ricevuti: {len(ids)}')
-        return ids
+        logger.info(f'[asteweb] Lotti nazionali ricevuti: {len(ids)} — limitati a 500 più recenti')
+        return ids[:500]
 
     # ------------------------------------------------------------------ #
     #  Layer 2 — Dettagli per batch di IDs                                #
